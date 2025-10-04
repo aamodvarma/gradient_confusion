@@ -1,4 +1,5 @@
 import torch
+import os
 import itertools
 import numpy as np
 import torch.nn as nn
@@ -152,12 +153,13 @@ if __name__ == "__main__":
             test_loop(test_loader, model, criterion)
 
         if default:
-            name = (
-                f"data/default2/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}.npz"
-            )
+            folder = "data/default2"
+            name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}.npz"
         else:
-            name = f"data/num4/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}.npz"
-        print(name)
+            folder = "data/num4"
+            name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}.npz"
+
+        os.makedirs(folder, exist_ok=True)
         np.savez(
             name,
             losses=losses,
