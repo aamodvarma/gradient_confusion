@@ -7,7 +7,9 @@ import random
 
 
 def compute_grad_vector(model, loss_fn, x, y):
-    x = x.view(x.shape[0], -1)
+    device = next(model.parameters()).device  # detect model's device
+    x = x.view(x.shape[0], -1).to(device)
+    y = y.to(device)
     model.zero_grad()
     out = model(x)
     loss = loss_fn(out, y)
@@ -20,7 +22,8 @@ def compute_grad_vector(model, loss_fn, x, y):
     return grad_vec.detach()
 
 
-def measure_gradient_confusion(model, loss_fn, dataloader, num_pairs=100, device="cpu"):
+def measure_gradient_confusion(model, loss_fn, dataloader, num_pairs=100):
+    device = next(model.parameters()).device  # detect model's device
     similarities = []
     data_iter = list(dataloader)
     for _ in range(num_pairs):
