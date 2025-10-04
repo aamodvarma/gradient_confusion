@@ -1,5 +1,5 @@
-./data/
 ./data
 data/
-./__pycache__/
-./*.out
+./__pycache__
+__pycache__/
+*.out
