@@ -101,11 +101,11 @@ if __name__ == "__main__":
     default = True
 
     if default:
-        train_loaders, test_loaders = default_mnist(batch_size=128)
+        train_loaders, test_loaders = default_mnist(batch_size=128, num_workers=8)
         train_loaders = [train_loaders]
         test_loaders = [test_loaders]
     else:
-        train_loaders, test_loaders = numbered_mnist(batch_size=128)
+        train_loaders, test_loaders = numbered_mnist(batch_size=128, num_workers=8)
 
     for width, depth, epochs, learning_rate in list(
         itertools.product(widths, depths, epoch_list, learning_rates)

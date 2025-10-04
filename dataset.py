@@ -63,6 +63,7 @@ def permuted_mnist(
             batch_size=batch_size,
             shuffle=True,
             num_workers=num_workers,
+            pin_memory=True,
         )
 
         test_loader = DataLoader(
@@ -70,6 +71,7 @@ def permuted_mnist(
             batch_size=batch_size,
             shuffle=False,
             num_workers=num_workers,
+            pin_memory=True,
         )
         train_loaders.append(train_loader)
         test_loaders.append(test_loader)
@@ -114,6 +116,7 @@ def numbered_mnist(
                 batch_size=batch_size,
                 shuffle=True,
                 num_workers=num_workers,
+                pin_memory=True,
             )
             digit_dataloader.append(loader)
         return digit_dataloader
@@ -123,7 +126,7 @@ def numbered_mnist(
     return train_dataloaders, test_dataloaders
 
 
-def default_mnist(batch_size=64):
+def default_mnist(batch_size=64, num_workers=0):
     transform = transforms.Compose([transforms.ToTensor()])
     train_dataset = datasets.MNIST(
         root="./data",
@@ -143,13 +146,15 @@ def default_mnist(batch_size=64):
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=0,
+        num_workers=num_workers,
+        pin_memory=True,
     )
 
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
-        num_workers=0,
+        num_workers=num_workers,
+        pin_memory=True,
     )
     return train_loader, test_loader
