@@ -7,6 +7,10 @@ import torch.optim as optim
 from dataset import *
 from confusion import *
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
+torch.backends.cudnn.benchmark = True
+
 
 class MnistNN(nn.Module):
     def __init__(
@@ -44,7 +48,8 @@ def train_loop(train_loader, model, criterion, optimizer, batches=None):
     model.train()
     total_loss = 0
     for batch, (X, y) in enumerate(train_loader):
-        X = X.view(X.size(0), -1)
+        X = X.view(X.size(0), -1).to(device)
+        y = y.to(device)
         pred = model(X)
         loss = criterion(pred, y)
 
@@ -70,7 +75,8 @@ def test_loop(test_loader, model, criterion):
     correct = 0
     with torch.no_grad():
         for X, y in test_loader:
-            X = X.view(X.size(0), -1)
+            X = X.view(X.size(0), -1).to(device)
+            y = y.to(device)
             pred = model(X)
             loss = criterion(pred, y)
             total_loss += loss.item()
@@ -104,7 +110,7 @@ if __name__ == "__main__":
     for width, depth, epochs, learning_rate in list(
         itertools.product(widths, depths, epoch_list, learning_rates)
     ):
-        model = MnistNN(input_size, width, depth, output_size)
+        model = MnistNN(input_size, width, depth, output_size).to(device)
 
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
