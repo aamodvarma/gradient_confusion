@@ -12,49 +12,46 @@ print("Using device:", device)
 torch.backends.cudnn.benchmark = True
 
 
-class LinearNN(nn.Module):
-    def __init__(self, input_size, width, depth, output_size):
+class MNISTMLP(nn.Module):
+    def __init__(
+        self,
+        input_size,
+        width,
+        depth,
+        output_size,
+        activation="identity",
+        init_type="glorot",
+    ):
         super().__init__()
         layers = []
         in_features = input_size
+
         for _ in range(depth):
             layers.append(nn.Linear(in_features, width))
-            layers.append(nn.Identity())  # identity activation
+            if activation == "tanh":
+                layers.append(nn.Tanh())
+            elif activation == "identity":
+                layers.append(nn.Identity())
+            else:
+                raise ValueError("activation must be 'identity' or 'tanh'")
             in_features = width
+
         layers.append(nn.Linear(in_features, output_size))
         self.net = nn.Sequential(*layers)
 
-        # Xavier init
-        self.apply(lambda m: self._init_weights(m))
+        self.apply(lambda m: self._init_weights(m, init_type))
 
-    def _init_weights(self, m):
+    def _init_weights(self, m, init_type):
         if isinstance(m, nn.Linear):
-            nn.init.xavier_normal_(m.weight)
-            if m.bias is not None:
-                nn.init.zeros_(m.bias)
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class TanhNN(nn.Module):
-    def __init__(self, input_size, width, depth, output_size):
-        super().__init__()
-        layers = []
-        in_features = input_size
-        for _ in range(depth):
-            layers.append(nn.Linear(in_features, width))
-            layers.append(nn.Tanh())
-            in_features = width
-        layers.append(nn.Linear(in_features, output_size))
-        self.net = nn.Sequential(*layers)
-
-        # Xavier init
-        self.apply(lambda m: self._init_weights(m))
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            nn.init.xavier_normal_(m.weight)
+            fan_in = m.weight.size(1)
+            fan_out = m.weight.size(0)
+            if init_type == "glorot":
+                std = (2.0 / (fan_in + fan_out)) ** 0.5
+            elif init_type == "lecun":
+                std = (1.0 / fan_in) ** 0.5
+            else:
+                raise ValueError("init_type must be 'glorot' or 'lecun'")
+            nn.init.normal_(m.weight, mean=0.0, std=std)
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
 
@@ -127,7 +124,7 @@ if __name__ == "__main__":
     for width, depth, epochs, learning_rate in list(
         itertools.product(widths, depths, epoch_list, learning_rates)
     ):
-        model = TanhNN(input_size, width, depth, output_size).to(device)
+        model = MNISTMLP(input_size, width, depth, output_size).to(device)
 
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
