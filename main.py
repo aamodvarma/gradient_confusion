@@ -12,31 +12,49 @@ print("Using device:", device)
 torch.backends.cudnn.benchmark = True
 
 
-class MnistNN(nn.Module):
-    def __init__(
-        self, input_size, width, depth, output_size, init_type="glorot"
-    ):  # or lecun
-        super(MnistNN, self).__init__()
+class LinearNN(nn.Module):
+    def __init__(self, input_size, width, depth, output_size):
+        super().__init__()
         layers = []
         in_features = input_size
-
-        for i in range(depth):
+        for _ in range(depth):
             layers.append(nn.Linear(in_features, width))
-            layers.append(nn.ReLU())
+            layers.append(nn.Identity())  # identity activation
             in_features = width
-
         layers.append(nn.Linear(in_features, output_size))
         self.net = nn.Sequential(*layers)
-        self.apply(lambda m: self._init_weights(m, init_type))
 
-    def _init_weights(self, m, init_type):
+        # Xavier init
+        self.apply(lambda m: self._init_weights(m))
+
+    def _init_weights(self, m):
         if isinstance(m, nn.Linear):
-            if init_type == "glorot":
-                nn.init.xavier_normal_(m.weight)
-            elif init_type == "lecun":
-                nn.init.normal_(m.weight, mean=0.0, std=(1.0 / m.in_features) ** 0.5)
-            else:
-                raise ValueError("init_type must be 'glorot' or 'lecun'")
+            nn.init.xavier_normal_(m.weight)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+
+    def forward(self, x):
+        return self.net(x)
+
+
+class TanhNN(nn.Module):
+    def __init__(self, input_size, width, depth, output_size):
+        super().__init__()
+        layers = []
+        in_features = input_size
+        for _ in range(depth):
+            layers.append(nn.Linear(in_features, width))
+            layers.append(nn.Tanh())
+            in_features = width
+        layers.append(nn.Linear(in_features, output_size))
+        self.net = nn.Sequential(*layers)
+
+        # Xavier init
+        self.apply(lambda m: self._init_weights(m))
+
+    def _init_weights(self, m):
+        if isinstance(m, nn.Linear):
+            nn.init.xavier_normal_(m.weight)
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
 
@@ -90,11 +108,10 @@ def test_loop(test_loader, model, criterion):
 
 
 if __name__ == "__main__":
-    # depths = [5, 10, 50, 100, 200]
-    widths = [100]
-    depths = [3, 10, 30, 100, 300, 1000]
+    depths = [300]
+    widths = [3, 10, 100]
     epoch_list = [100]
-    learning_rates = [0.001, 0.01]
+    learning_rates = [0.001]
     input_size = 784
     output_size = 10
     cycles = 1  # in each cycle all numbers are trained
@@ -110,7 +127,7 @@ if __name__ == "__main__":
     for width, depth, epochs, learning_rate in list(
         itertools.product(widths, depths, epoch_list, learning_rates)
     ):
-        model = MnistNN(input_size, width, depth, output_size).to(device)
+        model = TanhNN(input_size, width, depth, output_size).to(device)
 
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
