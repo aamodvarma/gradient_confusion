@@ -150,7 +150,7 @@ if __name__ == "__main__":
                         train_loaders[(number) % len(train_loaders)],
                     )  # at the end of number k, compute grad confusion of number k + 1
                     # min_sim = np.min(sim)
-                    min_sim = np.percentile(sim, 5)  # 5th percentile
+                    min_sim = np.percentile(sim, 1)  # 1st percentile
                     cosin_sims.append(min_sim)
 
         for number, test_loader in enumerate(test_loaders):
