@@ -59,7 +59,7 @@ class MNISTMLP(nn.Module):
         return self.net(x)
 
 
-def train_loop(train_loader, model, criterion, optimizer, batches=None):
+def train_loop(train_loader, model, criterion, optimizer, scheduler, batches=None):
     model.train()
     total_loss = 0
     for batch, (X, y) in enumerate(train_loader):
@@ -79,12 +79,14 @@ def train_loop(train_loader, model, criterion, optimizer, batches=None):
         if batch % 100 == 0:
             print(f"Batch {batch}, Loss: {loss.item():.4f}")
 
+    if scheduler:
+        scheduler.step()
     avg_loss = total_loss / len(train_loader)
     print(f"Epoch {epoch+1}, Loss: {avg_loss:.4f}")
     return avg_loss
 
 
-def test_loop(test_loader, model, criterion):
+def test_loop(test_loader, model, criterion, p=True):
     model.eval()
     total_loss = 0
     correct = 0
@@ -99,20 +101,22 @@ def test_loop(test_loader, model, criterion):
 
     avg_loss = total_loss / len(test_loader)
     accuracy = correct / len(test_loader.dataset)
-    print(f"Test Loss: {avg_loss:.4f}, Accuracy: {accuracy*100:.2f}%")
+    if p:
+        print(f"Test Loss: {avg_loss:.4f}, Accuracy: {accuracy*100:.2f}%")
 
     return avg_loss, accuracy
 
 
 if __name__ == "__main__":
-    depths = [300]
-    widths = [3, 10, 100]
-    epoch_list = [100]
+    depths = [3]
+    widths = [3]
+    epoch_list = [10]
     learning_rates = [0.001]
+    alphas = [0.95, 0.99, 0.9, 0.85]
     input_size = 784
     output_size = 10
-    cycles = 1  # in each cycle all numbers are trained
-    default = True
+    cycles = 10  # in each cycle all numbers are trained
+    default = False
 
     if default:
         train_loaders, test_loaders = default_mnist(batch_size=128, num_workers=8)
@@ -121,17 +125,26 @@ if __name__ == "__main__":
     else:
         train_loaders, test_loaders = numbered_mnist(batch_size=128, num_workers=8)
 
-    for width, depth, epochs, learning_rate in list(
-        itertools.product(widths, depths, epoch_list, learning_rates)
+    for width, depth, epochs, learning_rate, alpha in list(
+        itertools.product(widths, depths, epoch_list, learning_rates, alphas)
     ):
         model = MNISTMLP(input_size, width, depth, output_size).to(device)
 
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
-        # optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0)
+
+        # scheduler = torch.optim.lr_scheduler.StepLR(
+        #     optimizer,
+        #     step_size=epochs
+        #     * 10,  # multiply step_size by 10 to change after every cycle
+        #     gamma=alpha,
+        # )
+        scheduler = None
 
         cosin_sims = []
         losses = []
+        avg_errors = []
+        cosin_sims_numbered = {n: [] for n in range(10)}
 
         for cycle in range(cycles):
             print(f"----- Cycle {cycle} -----")
@@ -140,8 +153,14 @@ if __name__ == "__main__":
                 loss = 0
                 for epoch in range(epochs):
                     print(f"Epoch: {epoch} ")
+                    print([x["lr"] for x in optimizer.param_groups])
                     loss = train_loop(
-                        train_loader, model, criterion, optimizer, batches=None
+                        train_loader,
+                        model,
+                        criterion,
+                        optimizer,
+                        scheduler,
+                        batches=None,
                     )
                     losses.append(loss)
                     test_loop(test_loaders[number], model, criterion)
@@ -150,22 +169,32 @@ if __name__ == "__main__":
                         sim = measure_gradient_confusion(
                             model,
                             criterion,
-                            train_loaders[(number) % len(train_loaders)],
+                            train_loaders[0],
                         )  # at the end of number k, compute grad confusion of number k + 1
                         # min_sim = np.min(sim)
-                        min_sim = np.percentile(sim, 5)  # 5th percentile
+                        min_sim = np.percentile(sim, 1)  # 5th percentile
                         cosin_sims.append(min_sim)
-                    # compute grad simlairity after training each number
 
                 if not default:
-                    sim = measure_gradient_confusion(
-                        model,
-                        criterion,
-                        train_loaders[(number) % len(train_loaders)],
-                    )  # at the end of number k, compute grad confusion of number k + 1
-                    # min_sim = np.min(sim)
-                    min_sim = np.percentile(sim, 1)  # 1st percentile
-                    cosin_sims.append(min_sim)
+                    error = 0
+                    for task in range(10):
+                        # for each task  compute the between task gradieent confusion
+                        sim = between_task_gradient_confusion(
+                            model,
+                            criterion,
+                            train_loaders[number],  # the current task
+                            train_loaders[task],  # every other task
+                        )  # at the end of number k, compute grad confusion of all numbers
+                        min_sim = np.percentile(sim, 1)
+                        cosin_sims_numbered[task].append(min_sim)
+
+                        # now compute the average loss
+                        loss, _ = test_loop(
+                            test_loaders[task], model, criterion, p=False
+                        )
+                        error += loss
+                    avg_error = error / 10
+                    avg_errors.append(avg_error)
 
         for number, test_loader in enumerate(test_loaders):
             print("------- Final Results --------")
@@ -173,17 +202,31 @@ if __name__ == "__main__":
             test_loop(test_loader, model, criterion)
 
         if default:
-            folder = "data/default2"
+            folder = "data/default"
             name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}.npz"
         else:
-            folder = "data/num4"
-            name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}.npz"
+            folder = "data/num"
+            if scheduler is not None:
+                name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}-{alpha}.npz"
+            else:
+                name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}.npz"
 
         os.makedirs(folder, exist_ok=True)
+        if os.path.isfile(name):
+            i = 1
+            base, ext = os.path.splitext(name)
+            new_name = f"{base}-v{i}{ext}"
+            while os.path.isfile(new_name):
+                i += 1
+                new_name = f"{base}-v{i}{ext}"
+            name = new_name
+
         np.savez(
             name,
             losses=losses,
             cosin_sims=cosin_sims,
             epochs=epochs,
             cycles=cycles,
+            cosin_sims_numbered=np.array(cosin_sims_numbered, dtype=object),
+            avg_errors=avg_errors,
         )

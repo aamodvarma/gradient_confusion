@@ -40,3 +40,28 @@ def measure_gradient_confusion(model, loss_fn, dataloader, num_pairs=100):
         similarities.append(cos_sim.item())
 
     return similarities
+
+
+def between_task_gradient_confusion(
+    model, loss_fn, dataloader_1, dataloader_2, num_pairs=100
+):
+    device = next(model.parameters()).device  # detect model's device
+    similarities = []
+    data_iter_1 = list(dataloader_1)
+    data_iter_2 = list(dataloader_2)
+    for _ in range(num_pairs):
+        batch1 = random.sample(data_iter_1, 1)[0]  # sample from first task
+        batch2 = random.sample(data_iter_2, 1)[0]  # sample from second task
+        # print(batch1)
+        x1, y1 = batch1[0].to(device), batch1[1].to(device)
+        x2, y2 = batch2[0].to(device), batch2[1].to(device)
+
+        g1 = compute_grad_vector(model, loss_fn, x1, y1)
+        g2 = compute_grad_vector(model, loss_fn, x2, y2)
+
+        cos_sim = torch.nn.functional.cosine_similarity(
+            g1.unsqueeze(0), g2.unsqueeze(0)
+        )
+        similarities.append(cos_sim.item())
+
+    return similarities
