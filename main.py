@@ -108,8 +108,8 @@ def test_loop(test_loader, model, criterion, p=True):
 
 
 if __name__ == "__main__":
-    depths = [3]
-    widths = [3]
+    depths = [3, 10, 50, 100, 250]
+    widths = [10]
     epoch_list = [10]
     learning_rates = [0.001]
     alphas = [0.95, 0.99, 0.9, 0.85]
@@ -205,7 +205,7 @@ if __name__ == "__main__":
             folder = "data/default"
             name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}.npz"
         else:
-            folder = "data/num"
+            folder = "data/num/cyclic_min"
             if scheduler is not None:
                 name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}-{alpha}.npz"
             else:
