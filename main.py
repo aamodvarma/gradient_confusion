@@ -212,14 +212,14 @@ if __name__ == "__main__":
                 name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}.npz"
 
         os.makedirs(folder, exist_ok=True)
-        if os.path.isfile(name):
-            i = 1
-            base, ext = os.path.splitext(name)
-            new_name = f"{base}-v{i}{ext}"
-            while os.path.isfile(new_name):
-                i += 1
-                new_name = f"{base}-v{i}{ext}"
-            name = new_name
+        # if os.path.isfile(name):
+        #     i = 1
+        #     base, ext = os.path.splitext(name)
+        #     new_name = f"{base}-v{i}{ext}"
+        #     while os.path.isfile(new_name):
+        #         i += 1
+        #         new_name = f"{base}-v{i}{ext}"
+        #     name = new_name
 
         np.savez(
             name,
