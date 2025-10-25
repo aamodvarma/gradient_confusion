@@ -108,11 +108,12 @@ def test_loop(test_loader, model, criterion, p=True):
 
 
 if __name__ == "__main__":
-    depths = [3, 10, 50, 100, 250]
+    depths = [3, 5, 10, 50]
     widths = [10]
     epoch_list = [10]
     learning_rates = [0.001]
-    alphas = [0.95, 0.99, 0.9, 0.85]
+    # alphas = [0.95, 0.99, 0.9, 0.85]
+    alphas = [0.9]
     input_size = 784
     output_size = 10
     cycles = 10  # in each cycle all numbers are trained
@@ -133,13 +134,13 @@ if __name__ == "__main__":
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0)
 
-        # scheduler = torch.optim.lr_scheduler.StepLR(
-        #     optimizer,
-        #     step_size=epochs
-        #     * 10,  # multiply step_size by 10 to change after every cycle
-        #     gamma=alpha,
-        # )
-        scheduler = None
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=epochs
+            * 10,  # multiply step_size by 10 to change after every cycle
+            gamma=alpha,
+        )
+        # scheduler = None
 
         cosin_sims = []
         losses = []
@@ -177,22 +178,29 @@ if __name__ == "__main__":
 
                 if not default:
                     error = 0
-                    for task in range(10):
+                    btwn_task_sims = []
+                    for task1, task2 in itertools.product(range(10), range(10)):
                         # for each task  compute the between task gradieent confusion
                         sim = between_task_gradient_confusion(
                             model,
                             criterion,
-                            train_loaders[number],  # the current task
-                            train_loaders[task],  # every other task
+                            train_loaders[task1],  # the current task
+                            train_loaders[task2],  # every other task
                         )  # at the end of number k, compute grad confusion of all numbers
                         min_sim = np.percentile(sim, 1)
-                        cosin_sims_numbered[task].append(min_sim)
+                        btwn_task_sims.append(min_sim)
 
-                        # now compute the average loss
-                        loss, _ = test_loop(
-                            test_loaders[task], model, criterion, p=False
-                        )
-                        error += loss
+                        # for fixed current task, collect min sim across all tasks and store that.
+
+                        if task1 == number:
+                            cosin_sims_numbered[task2].append(min_sim)
+                            # only compute average loss fixing current task and varying over all other tasks.
+                            loss, _ = test_loop(
+                                test_loaders[task2], model, criterion, p=False
+                            )
+                            error += loss
+
+                    cosin_sims.append(np.min(btwn_task_sims))
                     avg_error = error / 10
                     avg_errors.append(avg_error)
 
@@ -205,21 +213,21 @@ if __name__ == "__main__":
             folder = "data/default"
             name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}.npz"
         else:
-            folder = "data/num/cyclic_min"
+            folder = "data/num/poster-graph-1"
             if scheduler is not None:
                 name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}-{alpha}.npz"
             else:
                 name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}.npz"
 
         os.makedirs(folder, exist_ok=True)
-        # if os.path.isfile(name):
-        #     i = 1
-        #     base, ext = os.path.splitext(name)
-        #     new_name = f"{base}-v{i}{ext}"
-        #     while os.path.isfile(new_name):
-        #         i += 1
-        #         new_name = f"{base}-v{i}{ext}"
-        #     name = new_name
+        if os.path.isfile(name):
+            i = 1
+            base, ext = os.path.splitext(name)
+            new_name = f"{base}-v{i}{ext}"
+            while os.path.isfile(new_name):
+                i += 1
+                new_name = f"{base}-v{i}{ext}"
+            name = new_name
 
         np.savez(
             name,
