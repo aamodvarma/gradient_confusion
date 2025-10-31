@@ -135,13 +135,13 @@ if __name__ == "__main__":
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=0)
 
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer,
-            step_size=epochs
-            * 10,  # multiply step_size by 10 to change after every cycle
-            gamma=alpha,
-        )
-        # scheduler = None
+        # scheduler = torch.optim.lr_scheduler.StepLR(
+        #     optimizer,
+        #     step_size=epochs
+        #     * 10,  # multiply step_size by 10 to change after every cycle
+        #     gamma=alpha,
+        # )
+        scheduler = None
 
         cosin_sims = []
         losses = []
