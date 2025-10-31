@@ -158,3 +158,8 @@ def default_mnist(batch_size=64, num_workers=0):
         pin_memory=True,
     )
     return train_loader, test_loader
+
+
+# train_loaders, test_loaders = numbered_mnist(batch_size=128, num_workers=8)
+# print(len(train_loaders))
+# print(len(test_loaders))

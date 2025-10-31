@@ -76,8 +76,8 @@ def train_loop(train_loader, model, criterion, optimizer, scheduler, batches=Non
         if batches and batch == batches:
             break
 
-        if batch % 100 == 0:
-            print(f"Batch {batch}, Loss: {loss.item():.4f}")
+        # if batch % 100 == 0:
+        # print(f"Batch {batch}, Loss: {loss.item():.4f}")
 
     if scheduler:
         scheduler.step()
@@ -108,7 +108,7 @@ def test_loop(test_loader, model, criterion, p=True):
 
 
 if __name__ == "__main__":
-    depths = [3, 5, 10, 50]
+    depths = [5]
     widths = [10]
     epoch_list = [10]
     learning_rates = [0.001]
@@ -117,6 +117,7 @@ if __name__ == "__main__":
     input_size = 784
     output_size = 10
     cycles = 10  # in each cycle all numbers are trained
+    iterations = 50
     default = False
 
     if default:
@@ -147,73 +148,78 @@ if __name__ == "__main__":
         avg_errors = []
         cosin_sims_numbered = {n: [] for n in range(10)}
 
-        for cycle in range(cycles):
-            print(f"----- Cycle {cycle} -----")
-            for number, train_loader in enumerate(train_loaders):
-                print(f"Training on digit: {number}")
-                loss = 0
-                for epoch in range(epochs):
-                    print(f"Epoch: {epoch} ")
-                    print([x["lr"] for x in optimizer.param_groups])
-                    loss = train_loop(
-                        train_loader,
+        # for cycle in range(cycles):
+        for itr in range(iterations):
+            # print(f"----- Cycle {cycle} -----")
+            print(f"----- Iteation {itr} -----")
+            number = random.randint(0, 9)
+            train_loader = train_loaders[number]
+            test_loader = test_loaders[number]
+            print(f"Training on digit: {number}")
+            loss = 0
+            for epoch in range(epochs):
+                print(f"Epoch: {epoch} ")
+                print([x["lr"] for x in optimizer.param_groups])
+                loss = train_loop(
+                    train_loader,
+                    model,
+                    criterion,
+                    optimizer,
+                    scheduler,
+                    batches=None,
+                )
+                losses.append(loss)
+                test_loop(test_loader, model, criterion)
+
+                if default:
+                    sim = measure_gradient_confusion(
                         model,
                         criterion,
-                        optimizer,
-                        scheduler,
-                        batches=None,
-                    )
-                    losses.append(loss)
-                    test_loop(test_loaders[number], model, criterion)
+                        train_loaders[0],
+                    )  # at the end of number k, compute grad confusion of number k + 1
+                    # min_sim = np.min(sim)
+                    min_sim = np.percentile(sim, 1)  # 5th percentile
+                    cosin_sims.append(min_sim)
 
-                    if default:
-                        sim = measure_gradient_confusion(
-                            model,
-                            criterion,
-                            train_loaders[0],
-                        )  # at the end of number k, compute grad confusion of number k + 1
-                        # min_sim = np.min(sim)
-                        min_sim = np.percentile(sim, 1)  # 5th percentile
-                        cosin_sims.append(min_sim)
+            if not default:
+                error = 0
+                btwn_task_sims = []
+                for task1, task2 in itertools.product(range(10), range(10)):
+                    # for each task  compute the between task gradieent confusion
+                    sim = between_task_gradient_confusion(
+                        model,
+                        criterion,
+                        train_loaders[task1],  # the current task
+                        train_loaders[task2],  # every other task
+                    )  # at the end of number k, compute grad confusion of all numbers
+                    min_sim = np.percentile(sim, 1)
+                    btwn_task_sims.append(min_sim)
 
-                if not default:
-                    error = 0
-                    btwn_task_sims = []
-                    for task1, task2 in itertools.product(range(10), range(10)):
-                        # for each task  compute the between task gradieent confusion
-                        sim = between_task_gradient_confusion(
-                            model,
-                            criterion,
-                            train_loaders[task1],  # the current task
-                            train_loaders[task2],  # every other task
-                        )  # at the end of number k, compute grad confusion of all numbers
-                        min_sim = np.percentile(sim, 1)
-                        btwn_task_sims.append(min_sim)
+                    # for fixed current task, collect min sim across all tasks and store that.
 
-                        # for fixed current task, collect min sim across all tasks and store that.
+                    if task1 == number:
+                        cosin_sims_numbered[task2].append(min_sim)
+                        # only compute average loss fixing current task and varying over all other tasks.
+                        loss, _ = test_loop(
+                            test_loaders[task2], model, criterion, p=False
+                        )
+                        error += loss
 
-                        if task1 == number:
-                            cosin_sims_numbered[task2].append(min_sim)
-                            # only compute average loss fixing current task and varying over all other tasks.
-                            loss, _ = test_loop(
-                                test_loaders[task2], model, criterion, p=False
-                            )
-                            error += loss
+                cosin_sims.append(np.min(btwn_task_sims))
+                avg_error = error / 10
+                avg_errors.append(avg_error)
 
-                    cosin_sims.append(np.min(btwn_task_sims))
-                    avg_error = error / 10
-                    avg_errors.append(avg_error)
-
-        for number, test_loader in enumerate(test_loaders):
-            print("------- Final Results --------")
-            print(f"Testing on digit: {number}")
-            test_loop(test_loader, model, criterion)
+        # for number, test_loader in enumerate(test_loaders):
+        #     print("------- Final Results --------")
+        #     print(f"Testing on digit: {number}")
+        #     test_loop(test_loader, model, criterion)
 
         if default:
             folder = "data/default"
             name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}.npz"
         else:
-            folder = "data/num/poster-graph-1"
+            print("EHLO")
+            folder = "data/poster-graphs-v2"
             if scheduler is not None:
                 name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}-{alpha}.npz"
             else:
