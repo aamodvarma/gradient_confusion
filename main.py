@@ -117,7 +117,7 @@ if __name__ == "__main__":
     input_size = 784
     output_size = 10
     cycles = 10  # in each cycle all numbers are trained
-    iterations = 50
+    iterations = 100
     default = False
 
     if default:
@@ -147,12 +147,14 @@ if __name__ == "__main__":
         losses = []
         avg_errors = []
         cosin_sims_numbered = {n: [] for n in range(10)}
+        num_list = []
 
         # for cycle in range(cycles):
         for itr in range(iterations):
             # print(f"----- Cycle {cycle} -----")
             print(f"----- Iteation {itr} -----")
             number = random.randint(0, 9)
+            num_list.append(number)
             train_loader = train_loaders[number]
             test_loader = test_loaders[number]
             print(f"Training on digit: {number}")
@@ -218,8 +220,7 @@ if __name__ == "__main__":
             folder = "data/default"
             name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}.npz"
         else:
-            print("EHLO")
-            folder = "data/poster-graphs-v2"
+            folder = "data/poster-random"
             if scheduler is not None:
                 name = f"{folder}/mnist_d{depth}_w{width}_e{epochs}_lr{learning_rate}_c{cycles}-{alpha}.npz"
             else:
@@ -243,4 +244,5 @@ if __name__ == "__main__":
             cycles=cycles,
             cosin_sims_numbered=np.array(cosin_sims_numbered, dtype=object),
             avg_errors=avg_errors,
+            num_list=num_list,
         )
